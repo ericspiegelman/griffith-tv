@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Griffith Observatory Television</title>
+<!-- iOS/Android home-screen app = true fullscreen (no Fullscreen API on iPhone) -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Griffith Observatory TV">
 <style>
   :root{
     --accent:#ff3b30;        /* channel accent / LIVE color */
@@ -566,15 +571,24 @@
     flashLower();
   });
   $("#muteBtn").addEventListener("click", ()=> setMuted(!muted));
+  let fsHintTimer = null;
+  const fsActive = () => document.fullscreenElement || document.webkitFullscreenElement;
   function toggleFs(){
     const el = document.documentElement;
-    if (document.fullscreenElement) (document.exitFullscreen||document.webkitExitFullscreen).call(document);
-    else (el.requestFullscreen||el.webkitRequestFullscreen).call(el);
+    if (fsActive()){ (document.exitFullscreen || document.webkitExitFullscreen || function(){}).call(document); return; }
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;   // desktop / iPad / Android
+    if (req){ try { req.call(el); } catch(e){} return; }
+    // iPhone Safari has no element-level Fullscreen API — only the home-screen app is truly fullscreen.
+    if (!window.navigator.standalone){
+      showStatus('On iPhone: tap <b>Share</b> then <b>“Add to Home Screen”</b>, and open it from there for full-screen TV.');
+      clearTimeout(fsHintTimer); fsHintTimer = setTimeout(hideStatus, 7000);
+    }
   }
   $("#fsBtn").addEventListener("click", toggleFs);
-  document.addEventListener("fullscreenchange", ()=>{
-    $("#fsBtn").textContent = document.fullscreenElement ? "🗗" : "⛶";
-  });
+  ["fullscreenchange","webkitfullscreenchange"].forEach(e =>
+    document.addEventListener(e, ()=>{ $("#fsBtn").textContent = fsActive() ? "🗗" : "⛶"; }));
+  // Launched as a home-screen app? It's already fullscreen — hide the button.
+  if (window.navigator.standalone) $("#fsBtn").style.display = "none";
   $("#guideBtn").addEventListener("click", ()=>{
     const tr = document.querySelector(".topright").getBoundingClientRect();
     $("#guide").style.top = (tr.bottom + 6) + "px";   // drop it just under the buttons
